@@ -1,0 +1,51 @@
+# Unity
+unity/ChessTrainer/[Ll]ibrary/
+unity/ChessTrainer/[Tt]emp/
+unity/ChessTrainer/[Oo]bj/
+unity/ChessTrainer/[Bb]uild/
+unity/ChessTrainer/[Bb]uilds/
+unity/ChessTrainer/[Ll]ogs/
+unity/ChessTrainer/[Uu]ser[Ss]ettings/
+unity/ChessTrainer/MemoryCaptures/
+unity/ChessTrainer/.vs/
+unity/ChessTrainer/.vsconfig
+unity/ChessTrainer/*.csproj
+unity/ChessTrainer/*.sln
+unity/ChessTrainer/*.slnx
+unity/ChessTrainer/*.user
+unity/ChessTrainer/*.pidb
+unity/ChessTrainer/*.booproj
+unity/ChessTrainer/*.svd
+unity/ChessTrainer/*.pdb
+unity/ChessTrainer/*.mdb
+unity/ChessTrainer/*.apk
+unity/ChessTrainer/*.unitypackage
+unity/ChessTrainer/crashlytics-build.properties
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+dist/
+build/
+*.spec
+
+# Datenbank und große Daten
+*.db
+*.db-shm
+*.db-wal
+data/downloads/
+*.zst
+*.pgn.gz
+
+# Stockfish-Binary wird nicht eingecheckt (siehe README)
+unity/ChessTrainer/Assets/StreamingAssets/stockfish/
+
+# Editor/OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store

@@ -4,6 +4,8 @@ Schach-Trainer mit Trainingskarten, Rätseln und Stockfish-Bewertung. ITP2-Proje
 
 Die App ist in Unity (C#) geschrieben. Positionen, Tags und Rätsel werden vorher mit einer Python-Pipeline in eine SQLite-Datenbank geladen, die die App dann liest. Genauer beschrieben in [docs/architektur.md](docs/architektur.md).
 
+[![Architektur](docs/architektur.png)](https://miro.com/app/board/uXjVEPtAqKY=/)
+
 ## Ordner
 
 | Ordner | Inhalt |

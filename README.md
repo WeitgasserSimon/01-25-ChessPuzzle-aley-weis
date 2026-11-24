@@ -40,7 +40,7 @@ Die App ist in Unity (C#) geschrieben. Positionen, Tags und Rätsel werden vorhe
 4. In Unity Hub „Add project from disk“ und `unity/ChessTrainer` auswählen
 5. Szene `Assets/Scenes/Main.unity` öffnen und Play drücken
 
-Die Schritte zum Befüllen der Datenbank kommen dazu, sobald die Pipeline steht (#1, #2).
+Die Schritte zum Befüllen der Datenbank kommen dazu, sobald der Import steht (#2).
 
 ## Tests
 

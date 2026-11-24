@@ -83,7 +83,52 @@ CREATE TABLE repertoire_eintrag (
     CHECK (eco IS NOT NULL OR eroeffnung IS NOT NULL)
 );
 
+-- Importierte eigene Partien (#5). nutzer_farbe ist die Seite, die der Nutzer gespielt hat.
+CREATE TABLE partie (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutzer_id     INTEGER REFERENCES nutzer(id) ON DELETE CASCADE,
+    nutzer_farbe  TEXT    CHECK (nutzer_farbe IN ('weiss', 'schwarz')),
+    weiss         TEXT,
+    schwarz       TEXT,
+    ergebnis      TEXT    CHECK (ergebnis IN ('1-0', '0-1', '1/2-1/2', '*')),
+    event         TEXT,
+    gespielt_am   TEXT,
+    quelle        TEXT,
+    importiert_am TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Stellung vor Halbzug ply (0 = Startstellung) und der Zug, der dort gespielt wurde (UCI).
+-- Nach dem letzten Zug ist zug NULL.
+CREATE TABLE partie_position (
+    partie_id   INTEGER NOT NULL REFERENCES partie(id) ON DELETE CASCADE,
+    ply         INTEGER NOT NULL CHECK (ply >= 0),
+    position_id INTEGER NOT NULL REFERENCES position(id),
+    zug         TEXT,
+    PRIMARY KEY (partie_id, ply)
+);
+
+-- Lichess-Rätsel. position ist die Stellung nach dem Zug des Gegners (vorzug),
+-- loesung sind die UCI-Züge ab dort, abwechselnd Löser und Gegner.
+-- beliebtheit geht bei Lichess von -100 bis 100.
+CREATE TABLE raetsel (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    lichess_id        TEXT    NOT NULL UNIQUE,
+    position_id       INTEGER NOT NULL REFERENCES position(id),
+    fen_vorher        TEXT,
+    vorzug            TEXT,
+    loesung           TEXT    NOT NULL,
+    rating            INTEGER NOT NULL,
+    rating_abweichung INTEGER,
+    beliebtheit       INTEGER CHECK (beliebtheit BETWEEN -100 AND 100),
+    anzahl_gespielt   INTEGER CHECK (anzahl_gespielt >= 0),
+    themen            TEXT
+);
+
 CREATE INDEX idx_position_eco ON position(eco);
+CREATE INDEX idx_partie_nutzer ON partie(nutzer_id);
+CREATE INDEX idx_partie_position_position ON partie_position(position_id);
+CREATE INDEX idx_raetsel_position ON raetsel(position_id);
+CREATE INDEX idx_raetsel_rating ON raetsel(rating);
 CREATE INDEX idx_karte_faellig ON karte(nutzer_id, faellig_am);
 CREATE INDEX idx_versuch_karte ON versuch(karte_id);
 CREATE INDEX idx_repertoire_nutzer ON repertoire_eintrag(nutzer_id);

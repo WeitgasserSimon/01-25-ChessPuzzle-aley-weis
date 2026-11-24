@@ -6,15 +6,6 @@ from pipeline import db
 from pipeline.__main__ import main
 
 
-@pytest.fixture
-def conn(tmp_path):
-    pfad = tmp_path / "test.db"
-    db.init_db(pfad)
-    c = db.connect(pfad)
-    yield c
-    c.close()
-
-
 def test_init_db_legt_datei_an(tmp_path):
     pfad = tmp_path / "sub" / "test.db"
     db.init_db(pfad)

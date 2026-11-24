@@ -48,7 +48,45 @@ CREATE TABLE position_tag (
     PRIMARY KEY (position_id, tag_id)
 );
 
+-- Trainingskarte eines Nutzers für eine Stellung. stufe 0 = neu, 1–5 = Wiederholungsstufe (#24).
+CREATE TABLE karte (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutzer_id   INTEGER NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+    position_id INTEGER NOT NULL REFERENCES position(id),
+    stufe       INTEGER NOT NULL DEFAULT 0 CHECK (stufe BETWEEN 0 AND 5),
+    faellig_am  TEXT    NOT NULL DEFAULT (date('now')),
+    erstellt_am TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (nutzer_id, position_id)
+);
+
+-- Jeder bestätigte Zug (#20). Der Nutzer ergibt sich über die Karte.
+-- gewertet = 0 bei "Nochmal versuchen" und beim zweiten Durchgang (#46, #24).
+CREATE TABLE versuch (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    karte_id  INTEGER NOT NULL REFERENCES karte(id) ON DELETE CASCADE,
+    zug       TEXT    NOT NULL,
+    urteil    TEXT    NOT NULL CHECK (urteil IN ('richtig', 'gut', 'fehler')),
+    zeit_ms   INTEGER CHECK (zeit_ms >= 0),
+    hinweise  INTEGER NOT NULL DEFAULT 0 CHECK (hinweise >= 0),
+    gewertet  INTEGER NOT NULL DEFAULT 1 CHECK (gewertet IN (0, 1)),
+    zeitpunkt TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Eröffnungen, die ein Nutzer spielt. quelle: selbst eingetragen oder aus eigenen Partien.
+CREATE TABLE repertoire_eintrag (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutzer_id  INTEGER NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+    farbe      TEXT    NOT NULL CHECK (farbe IN ('weiss', 'schwarz')),
+    eco        TEXT,
+    eroeffnung TEXT,
+    quelle     TEXT    NOT NULL DEFAULT 'manuell' CHECK (quelle IN ('manuell', 'partien')),
+    CHECK (eco IS NOT NULL OR eroeffnung IS NOT NULL)
+);
+
 CREATE INDEX idx_position_eco ON position(eco);
+CREATE INDEX idx_karte_faellig ON karte(nutzer_id, faellig_am);
+CREATE INDEX idx_versuch_karte ON versuch(karte_id);
+CREATE INDEX idx_repertoire_nutzer ON repertoire_eintrag(nutzer_id);
 CREATE INDEX idx_position_nicht_analysiert ON position(id) WHERE best_move IS NULL;
 CREATE INDEX idx_position_tag_tag ON position_tag(tag_id, position_id);
 CREATE INDEX idx_tag_kategorie ON tag(kategorie);

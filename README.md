@@ -2,7 +2,7 @@
 
 Schach-Trainer mit Trainingskarten, Rätseln und Stockfish-Bewertung. ITP2-Projekt von Simon Weitgasser und Yohannes.
 
-Die App ist in Unity (C#) geschrieben. Positionen, Tags und Rätsel werden vorher mit einer Python-Pipeline in eine SQLite-Datenbank geladen, die die App dann liest. Genauer beschrieben in [docs/architektur.md](docs/architektur.md). https://miro.com/app/board/uXjVEPtAqKY=/
+Die App ist in Unity (C#) geschrieben. Positionen, Tags und Rätsel werden vorher mit einer Python-Pipeline in eine SQLite-Datenbank geladen, die die App dann liest. Genauer beschrieben in [docs/architektur.md](docs/architektur.md).
 
 [![Architektur](docs/architektur.png)](https://miro.com/app/board/uXjVEPtAqKY=/)
 
@@ -32,7 +32,18 @@ Die App ist in Unity (C#) geschrieben. Positionen, Tags und Rätsel werden vorhe
    .venv\Scripts\activate
    pip install -r requirements.txt
    ```
-3. In Unity Hub „Add project from disk“ und `unity/ChessTrainer` auswählen
-4. Szene `Assets/Scenes/Main.unity` öffnen und Play drücken
+3. Leere Datenbank anlegen (im Hauptordner, mit aktivierter venv):
+   ```
+   python -m pipeline init-db
+   ```
+   Das erzeugt `db/positions.db`. Mit `--force` wird eine vorhandene Datenbank gelöscht und neu angelegt, mit `--db <pfad>` geht ein anderer Pfad.
+4. In Unity Hub „Add project from disk“ und `unity/ChessTrainer` auswählen
+5. Szene `Assets/Scenes/Main.unity` öffnen und Play drücken
 
 Die Schritte zum Befüllen der Datenbank kommen dazu, sobald die Pipeline steht (#1, #2).
+
+## Tests
+
+```
+python -m pytest pipeline/tests
+```

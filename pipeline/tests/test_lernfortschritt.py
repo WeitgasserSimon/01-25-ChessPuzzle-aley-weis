@@ -12,6 +12,18 @@ def ids(conn):
     return nutzer, position
 
 
+@pytest.fixture
+def italienisch(conn):
+    return conn.execute("INSERT INTO eroeffnung (eco, name) VALUES ('C50', 'Italian Game')").lastrowid
+
+
+def neuer_eintrag(conn, nutzer, eroeffnung, farbe="weiss"):
+    conn.execute(
+        "INSERT INTO repertoire_eintrag (nutzer_id, eroeffnung_id, farbe) VALUES (?, ?, ?)",
+        (nutzer, eroeffnung, farbe),
+    )
+
+
 def neue_karte(conn, nutzer, position):
     return conn.execute(
         "INSERT INTO karte (nutzer_id, position_id) VALUES (?, ?)", (nutzer, position)
@@ -88,28 +100,38 @@ def test_versuche_gehoeren_zum_nutzer(conn, ids):
     assert nutzer == ids[0]
 
 
-def test_repertoire_eintrag(conn, ids):
-    conn.execute(
-        "INSERT INTO repertoire_eintrag (nutzer_id, farbe, eco, eroeffnung) VALUES (?, 'weiss', 'C50', 'Italian Game')",
-        (ids[0],),
-    )
-    assert conn.execute("SELECT farbe, eco, quelle FROM repertoire_eintrag").fetchone() == ("weiss", "C50", "manuell")
+def test_repertoire_eintrag(conn, ids, italienisch):
+    neuer_eintrag(conn, ids[0], italienisch)
+    row = conn.execute(
+        """SELECT r.farbe, e.eco, e.name, r.quelle FROM repertoire_eintrag r
+           JOIN eroeffnung e ON e.id = r.eroeffnung_id"""
+    ).fetchone()
+    assert row == ("weiss", "C50", "Italian Game", "manuell")
 
 
-def test_repertoire_braucht_eco_oder_name(conn, ids):
+def test_repertoire_braucht_eroeffnung(conn, ids):
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute("INSERT INTO repertoire_eintrag (nutzer_id, farbe) VALUES (?, 'weiss')", (ids[0],))
-
-
-def test_repertoire_farbe(conn, ids):
     with pytest.raises(sqlite3.IntegrityError):
-        conn.execute("INSERT INTO repertoire_eintrag (nutzer_id, farbe, eco) VALUES (?, 'rot', 'C50')", (ids[0],))
+        neuer_eintrag(conn, ids[0], 999)
 
 
-def test_nutzer_loeschen_loescht_lernfortschritt(conn, ids):
+def test_repertoire_kein_doppelter_eintrag(conn, ids, italienisch):
+    neuer_eintrag(conn, ids[0], italienisch, "weiss")
+    neuer_eintrag(conn, ids[0], italienisch, "schwarz")
+    with pytest.raises(sqlite3.IntegrityError):
+        neuer_eintrag(conn, ids[0], italienisch, "weiss")
+
+
+def test_repertoire_farbe(conn, ids, italienisch):
+    with pytest.raises(sqlite3.IntegrityError):
+        neuer_eintrag(conn, ids[0], italienisch, "rot")
+
+
+def test_nutzer_loeschen_loescht_lernfortschritt(conn, ids, italienisch):
     k = neue_karte(conn, *ids)
     conn.execute("INSERT INTO versuch (karte_id, zug, urteil) VALUES (?, 'e2e4', 'richtig')", (k,))
-    conn.execute("INSERT INTO repertoire_eintrag (nutzer_id, farbe, eco) VALUES (?, 'weiss', 'C50')", (ids[0],))
+    neuer_eintrag(conn, ids[0], italienisch)
 
     conn.execute("DELETE FROM nutzer WHERE id = ?", (ids[0],))
     for tabelle in ("karte", "versuch", "repertoire_eintrag"):

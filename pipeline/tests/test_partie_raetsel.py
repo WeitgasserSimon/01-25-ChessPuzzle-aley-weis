@@ -19,7 +19,7 @@ def neue_partie(conn, nutzer=None):
 
 
 def neues_raetsel(conn, position, lichess_id="00008", **werte):
-    daten = {"lichess_id": lichess_id, "position_id": position, "loesung": "f2g3 e6e7", "rating": 1800}
+    daten = {"lichess_id": lichess_id, "position_id": position, "rating": 1800}
     daten.update(werte)
     spalten = ", ".join(daten)
     platzhalter = ", ".join("?" * len(daten))
@@ -90,9 +90,42 @@ def test_partie_loeschen_behaelt_positionen(conn):
 
 def test_raetsel_speichern(conn):
     p = neue_position(conn, E4_FEN)
-    neues_raetsel(conn, p, beliebtheit=94, rating_abweichung=75, anzahl_gespielt=600, themen="mate mateIn2")
-    row = conn.execute("SELECT loesung, rating, beliebtheit FROM raetsel").fetchone()
-    assert row == ("f2g3 e6e7", 1800, 94)
+    r = neues_raetsel(conn, p, vorzug="e2e4", beliebtheit=94, rating_abweichung=75, anzahl_gespielt=600)
+    conn.executemany(
+        "INSERT INTO raetsel_zug (raetsel_id, nr, zug) VALUES (?, ?, ?)",
+        [(r, 1, "f2g3"), (r, 2, "e6e7"), (r, 3, "b2b1")],
+    )
+    for thema in ("mate", "mateIn2"):
+        t = conn.execute("INSERT INTO tag (name, kategorie) VALUES (?, 'raetsel_thema')", (thema,)).lastrowid
+        conn.execute("INSERT INTO raetsel_tag (raetsel_id, tag_id) VALUES (?, ?)", (r, t))
+
+    assert conn.execute("SELECT rating, beliebtheit, vorzug FROM raetsel").fetchone() == (1800, 94, "e2e4")
+    loesung = conn.execute("SELECT zug FROM raetsel_zug WHERE raetsel_id = ? ORDER BY nr", (r,)).fetchall()
+    assert [z for (z,) in loesung] == ["f2g3", "e6e7", "b2b1"]
+    themen = conn.execute(
+        """SELECT t.name FROM raetsel_tag rt JOIN tag t ON t.id = rt.tag_id
+           WHERE rt.raetsel_id = ? ORDER BY t.name""",
+        (r,),
+    ).fetchall()
+    assert themen == [("mate",), ("mateIn2",)]
+
+
+def test_raetsel_zug_nr_eindeutig(conn):
+    r = neues_raetsel(conn, neue_position(conn, E4_FEN))
+    conn.execute("INSERT INTO raetsel_zug (raetsel_id, nr, zug) VALUES (?, 1, 'f2g3')", (r,))
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("INSERT INTO raetsel_zug (raetsel_id, nr, zug) VALUES (?, 1, 'e6e7')", (r,))
+
+
+def test_raetsel_loeschen_loescht_loesung_und_themen(conn):
+    r = neues_raetsel(conn, neue_position(conn, E4_FEN))
+    t = conn.execute("INSERT INTO tag (name, kategorie) VALUES ('fork', 'raetsel_thema')").lastrowid
+    conn.execute("INSERT INTO raetsel_zug (raetsel_id, nr, zug) VALUES (?, 1, 'f2g3')", (r,))
+    conn.execute("INSERT INTO raetsel_tag (raetsel_id, tag_id) VALUES (?, ?)", (r, t))
+    conn.execute("DELETE FROM raetsel WHERE id = ?", (r,))
+    assert conn.execute("SELECT COUNT(*) FROM raetsel_zug").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM raetsel_tag").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM tag").fetchone()[0] == 1
 
 
 def test_raetsel_lichess_id_eindeutig(conn):
@@ -110,10 +143,7 @@ def test_raetsel_beliebtheit_bereich(conn, wert):
         neues_raetsel(conn, p, beliebtheit=wert)
 
 
-def test_raetsel_braucht_loesung_und_position(conn):
-    p = neue_position(conn, E4_FEN)
-    with pytest.raises(sqlite3.IntegrityError):
-        neues_raetsel(conn, p, loesung=None)
+def test_raetsel_braucht_position(conn):
     with pytest.raises(sqlite3.IntegrityError):
         neues_raetsel(conn, 999)
 
@@ -121,6 +151,7 @@ def test_raetsel_braucht_loesung_und_position(conn):
 def test_alle_tabellen_da(conn):
     tabellen = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert {
-        "nutzer", "position", "tag", "position_tag", "karte", "versuch",
-        "repertoire_eintrag", "partie", "partie_position", "raetsel",
+        "nutzer", "eroeffnung", "position", "hauptvariante_zug", "tag", "position_tag",
+        "karte", "versuch", "repertoire_eintrag", "partie", "partie_position",
+        "raetsel", "raetsel_zug", "raetsel_tag",
     } <= tabellen

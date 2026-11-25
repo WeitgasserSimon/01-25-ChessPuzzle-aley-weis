@@ -1,5 +1,6 @@
 -- Schema für positions.db, gilt für Pipeline und App (siehe docs/architektur.md).
 -- Wer hier etwas ändert, erhöht user_version am Ende und sagt es dem anderen.
+-- Alle Tabellen sind in 3. Normalform: keine Listen in Spalten, nichts doppelt gespeichert.
 
 PRAGMA foreign_keys = ON;
 
@@ -13,19 +14,24 @@ CREATE TABLE nutzer (
     erstellt_am   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Eröffnungen aus dem ECO-Datensatz. Ein ECO-Code hat mehrere Varianten mit eigenem Namen.
+CREATE TABLE eroeffnung (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    eco  TEXT NOT NULL,
+    name TEXT NOT NULL,
+    UNIQUE (eco, name)
+);
+
 -- Eine Stellung pro FEN. Die Analysefelder bleiben NULL, bis Stockfish die Stellung
--- angeschaut hat (#2, #19). evaluation in Bauern aus Sicht der Seite am Zug,
--- bei Matt steht stattdessen mate (positiv =  Seite am Zug setzt matt).
--- hauptvariante sind UCI-Züge mit Leerzeichen getrennt.
+-- angeschaut hat (#2, #19), analysiert_am IS NULL heißt also "noch nicht analysiert".
+-- evaluation in Bauern aus Sicht der Seite am Zug, bei Matt steht stattdessen mate
+-- (positiv = Seite am Zug setzt matt).
 CREATE TABLE position (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     fen            TEXT    NOT NULL UNIQUE,
-    eco            TEXT,
-    eroeffnung     TEXT,
-    best_move      TEXT,
+    eroeffnung_id  INTEGER REFERENCES eroeffnung(id),
     evaluation     REAL,
     mate           INTEGER,
-    hauptvariante  TEXT,
     analyse_tiefe  INTEGER,
     analyse_engine TEXT,
     analysiert_am  TEXT,
@@ -34,7 +40,15 @@ CREATE TABLE position (
     erstellt_am    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
--- kategorie z. B. phase, material, bauernstruktur, motiv (Katalog in #33)
+-- Hauptvariante von Stockfish, ein Zug (UCI) pro Zeile. nr 1 ist der Bestzug.
+CREATE TABLE hauptvariante_zug (
+    position_id INTEGER NOT NULL REFERENCES position(id) ON DELETE CASCADE,
+    nr          INTEGER NOT NULL CHECK (nr >= 1),
+    zug         TEXT    NOT NULL,
+    PRIMARY KEY (position_id, nr)
+);
+
+-- kategorie z. B. phase, material, bauernstruktur, motiv, raetsel_thema (Katalog in #33)
 CREATE TABLE tag (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     name      TEXT NOT NULL,
@@ -74,13 +88,12 @@ CREATE TABLE versuch (
 
 -- Eröffnungen, die ein Nutzer spielt. quelle: selbst eingetragen oder aus eigenen Partien.
 CREATE TABLE repertoire_eintrag (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    nutzer_id  INTEGER NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
-    farbe      TEXT    NOT NULL CHECK (farbe IN ('weiss', 'schwarz')),
-    eco        TEXT,
-    eroeffnung TEXT,
-    quelle     TEXT    NOT NULL DEFAULT 'manuell' CHECK (quelle IN ('manuell', 'partien')),
-    CHECK (eco IS NOT NULL OR eroeffnung IS NOT NULL)
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutzer_id     INTEGER NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+    eroeffnung_id INTEGER NOT NULL REFERENCES eroeffnung(id),
+    farbe         TEXT    NOT NULL CHECK (farbe IN ('weiss', 'schwarz')),
+    quelle        TEXT    NOT NULL DEFAULT 'manuell' CHECK (quelle IN ('manuell', 'partien')),
+    UNIQUE (nutzer_id, eroeffnung_id, farbe)
 );
 
 -- Importierte eigene Partien (#5). nutzer_farbe ist die Seite, die der Nutzer gespielt hat.
@@ -107,33 +120,46 @@ CREATE TABLE partie_position (
     PRIMARY KEY (partie_id, ply)
 );
 
--- Lichess-Rätsel. position ist die Stellung nach dem Zug des Gegners (vorzug),
--- loesung sind die UCI-Züge ab dort, abwechselnd Löser und Gegner.
--- beliebtheit geht bei Lichess von -100 bis 100.
+-- Lichess-Rätsel. position ist die Stellung, die der Löser sieht, vorzug der Zug
+-- des Gegners davor (zum Anzeigen). beliebtheit geht bei Lichess von -100 bis 100.
 CREATE TABLE raetsel (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     lichess_id        TEXT    NOT NULL UNIQUE,
     position_id       INTEGER NOT NULL REFERENCES position(id),
-    fen_vorher        TEXT,
     vorzug            TEXT,
-    loesung           TEXT    NOT NULL,
     rating            INTEGER NOT NULL,
     rating_abweichung INTEGER,
     beliebtheit       INTEGER CHECK (beliebtheit BETWEEN -100 AND 100),
-    anzahl_gespielt   INTEGER CHECK (anzahl_gespielt >= 0),
-    themen            TEXT
+    anzahl_gespielt   INTEGER CHECK (anzahl_gespielt >= 0)
 );
 
-CREATE INDEX idx_position_eco ON position(eco);
+-- Lösung des Rätsels, ein Zug (UCI) pro Zeile, abwechselnd Löser und Gegner. nr 1 ist der erste Zug des Lösers.
+CREATE TABLE raetsel_zug (
+    raetsel_id INTEGER NOT NULL REFERENCES raetsel(id) ON DELETE CASCADE,
+    nr         INTEGER NOT NULL CHECK (nr >= 1),
+    zug        TEXT    NOT NULL,
+    PRIMARY KEY (raetsel_id, nr)
+);
+
+-- Lichess-Themen eines Rätsels (mateIn2, fork, ...), als Tags mit kategorie 'raetsel_thema'.
+CREATE TABLE raetsel_tag (
+    raetsel_id INTEGER NOT NULL REFERENCES raetsel(id) ON DELETE CASCADE,
+    tag_id     INTEGER NOT NULL REFERENCES tag(id) ON DELETE CASCADE,
+    PRIMARY KEY (raetsel_id, tag_id)
+);
+
+CREATE INDEX idx_position_eroeffnung ON position(eroeffnung_id);
+CREATE INDEX idx_position_nicht_analysiert ON position(id) WHERE analysiert_am IS NULL;
+CREATE INDEX idx_position_tag_tag ON position_tag(tag_id, position_id);
+CREATE INDEX idx_tag_kategorie ON tag(kategorie);
+CREATE INDEX idx_karte_faellig ON karte(nutzer_id, faellig_am);
+CREATE INDEX idx_karte_position ON karte(position_id);
+CREATE INDEX idx_versuch_karte ON versuch(karte_id);
+CREATE INDEX idx_repertoire_eroeffnung ON repertoire_eintrag(eroeffnung_id);
 CREATE INDEX idx_partie_nutzer ON partie(nutzer_id);
 CREATE INDEX idx_partie_position_position ON partie_position(position_id);
 CREATE INDEX idx_raetsel_position ON raetsel(position_id);
 CREATE INDEX idx_raetsel_rating ON raetsel(rating);
-CREATE INDEX idx_karte_faellig ON karte(nutzer_id, faellig_am);
-CREATE INDEX idx_versuch_karte ON versuch(karte_id);
-CREATE INDEX idx_repertoire_nutzer ON repertoire_eintrag(nutzer_id);
-CREATE INDEX idx_position_nicht_analysiert ON position(id) WHERE best_move IS NULL;
-CREATE INDEX idx_position_tag_tag ON position_tag(tag_id, position_id);
-CREATE INDEX idx_tag_kategorie ON tag(kategorie);
+CREATE INDEX idx_raetsel_tag_tag ON raetsel_tag(tag_id, raetsel_id);
 
 PRAGMA user_version = 1;

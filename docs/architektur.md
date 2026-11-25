@@ -33,10 +33,10 @@ Die UI ruft nur die Backend-Klassen auf (z. B. `TrainingService`, `ChessDatabase
 
 | Tabellen | schreibt | liest |
 |---|---|---|
-| `position`, `tag`, `position_tag`, `raetsel`, `partie`, `partie_position` | Pipeline | App |
+| `eroeffnung`, `position`, `hauptvariante_zug`, `tag`, `position_tag`, `raetsel`, `raetsel_zug`, `raetsel_tag`, `partie`, `partie_position` | Pipeline | App |
 | `nutzer`, `karte`, `versuch`, `repertoire_eintrag` | App | App |
 
-`best_move` und `evaluation` in `position` füllt entweder die Pipeline vorab oder die App bei Bedarf über Stockfish (#19).
+Die Analyse (`evaluation`, `mate`, `analysiert_am` in `position` und die Hauptvariante in `hauptvariante_zug`, Zug 1 ist der Bestzug) füllt entweder die Pipeline vorab oder die App bei Bedarf über Stockfish (#19). Das Schema ist in 3. Normalform, deshalb stehen Zugfolgen und Themen in eigenen Tabellen und nicht als Liste in einer Spalte.
 
 Die Datenbank läuft im WAL-Modus. Wo sie liegt:
 - Beim Entwickeln: `db/positions.db`. Sie ist nicht im Repo und wird mit der Pipeline erzeugt.
